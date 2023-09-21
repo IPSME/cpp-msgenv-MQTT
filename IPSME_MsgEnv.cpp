@@ -1,5 +1,6 @@
 
 
+#include <assert.h>
 #include <string.h>
 // #include <iostream>
 
@@ -18,8 +19,13 @@ void messageCallback(struct mosquitto* mosq, void* obj, const struct mosquitto_m
 
     IPSME_MsgEnv::t_handle* p_h = static_cast<IPSME_MsgEnv::t_handle*>(obj);
 
-    if (p_h->p_callback)
-        p_h->p_callback(static_cast<char*>(message->payload));
+    try {
+        if (p_h->p_callback)
+            p_h->p_callback(static_cast<char*>(message->payload));
+    }
+    catch (...) {
+        assert(false);
+    }
 }
 
 RET_TYPE IPSME_MsgEnv::init(t_handle* p_h)

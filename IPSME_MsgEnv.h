@@ -8,25 +8,20 @@
 
 #include <mosquitto.h>
 
+// rather than include an init() in the interface
+// we assume the dev knows we are using mosquitto and calls mosquitto_lib_init() and mosquitto_lib_cleanup()
+
 namespace IPSME_MsgEnv
 {
-	typedef void (*tp_callback)(const char* psz_msg);
-	struct t_handle {
-		t_handle() : p_mosq(NULL), p_callback(NULL) {}
-		struct mosquitto* p_mosq;
-		tp_callback p_callback;
-	};
+	typedef void (*tp_callback)(const char* psz_msg, void* p_void);
 	typedef int RET_TYPE;
 
-	RET_TYPE init(t_handle* p_h);
-	RET_TYPE destroy(t_handle* p_h);
+	RET_TYPE subscribe(tp_callback p_callback, void* p_void);
+	RET_TYPE unsubscribe(tp_callback p_callback);
 
-	RET_TYPE subscribe(t_handle& h, IPSME_MsgEnv::tp_callback p_callback);
-	RET_TYPE unsubscribe(t_handle& h);
+	RET_TYPE publish(const char* psz_msg);
 
-	RET_TYPE publish(t_handle& h, const char* psz_msg);
-
-	RET_TYPE process_requests(const t_handle& p_h, int i_timeout= 0);
+	RET_TYPE process_requests(int i_timeout= 0);
 }
 
 #endif // IPSME_MSGENV_H

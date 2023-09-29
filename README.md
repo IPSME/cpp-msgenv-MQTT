@@ -1,28 +1,39 @@
 # cpp-msgenv-MQTT
-This library contains the wrapper code for sending messages to the macOS messaging environment (ME). The ready available pubsub between processes on macOS is the `NSDistributedNotificationCenter`.
+This library contains the wrapper code for sending messages to a Windows messaging environment (ME). For this implementation, MQTT is used as ME, implemented using Eclipse Mosquitto.
 
 > ### IPSME- Idempotent Publish/Subscribe Messaging Environment
 > https://dl.acm.org/doi/abs/10.1145/3458307.3460966
 
-#### Initializiing
+#### Initializiing && Cleanup
 ```
-IPSME_MsgEnv::t_handle h;
-IPSME_MsgEnv::init(&h);
+#include "cpp-msgenv-MQTT.git/IPSME_MsgEnv.h"
+
+int main() 
+{
+    mosquitto_lib_init();
+
+    // ...
+
+    mosquitto_lib_cleanup();
+
+    return 0;
+}
+
 ```
 
 #### Subscribing
 ```
-void handler_(const char* psz_msg)
+void handler_(const char* psz_msg, void* p_void)
 {
     std::cout << "Received message: " << psz_msg << std::endl;
 
 }
 
-RET_TYPE ret = IPSME_MsgEnv::subscribe(h, &handler_);
+RET_TYPE ret = IPSME_MsgEnv::subscribe(&handler_, NULL);
 assert(ret == 0);
 
 while (true) {
-     IPSME_MsgEnv::process_requests(h);
+     IPSME_MsgEnv::process_requests();
 
      // ...
 }
@@ -32,7 +43,7 @@ It is by design that a participant receives the messages it has published itself
 
 #### Publishing
 ```
-RET_TYPE ret = IPSME_MsgEnv::publish(h, "...");
+RET_TYPE ret = IPSME_MsgEnv::publish("...");
 assert(ret == 0);
 ```
 

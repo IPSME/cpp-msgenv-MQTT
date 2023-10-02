@@ -21,6 +21,12 @@ int main()
 
 ```
 
+* include: ```<path>\mosquitto\devel```
+* lib: ```<path>\mosquitto\devel```
+* dependencies: ```mosquitto.lib```
+* runtime: ```PATH=($PATH);<path>\mosquitto```
+
+
 #### Subscribing
 ```
 void handler_(const char* psz_msg, void* p_void)

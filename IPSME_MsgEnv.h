@@ -13,13 +13,15 @@
 
 namespace IPSME_MsgEnv
 {
-	typedef void (*tp_callback)(const char* psz_msg, void* p_void);
 	typedef int RET_TYPE;
+	typedef char const * const MSG_TYPE;
+
+	typedef void (*tp_callback)(MSG_TYPE, void* p_void);
 
 	RET_TYPE subscribe(tp_callback p_callback, void* p_void);
 	RET_TYPE unsubscribe(tp_callback p_callback);
 
-	RET_TYPE publish(const char* psz_msg);
+	RET_TYPE publish(MSG_TYPE);
 
 	RET_TYPE process_requests(int i_timeout= 0);
 }

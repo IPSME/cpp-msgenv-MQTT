@@ -84,7 +84,7 @@ void message_callback_(struct mosquitto* mosq, void* UNUSED, const struct mosqui
         void* p_void= pair.second;
 
         try {
-            p_callback(static_cast<char*>(p_message->payload), p_void);
+            p_callback(static_cast<IPSME_MsgEnv::MSG_TYPE>(p_message->payload), p_void);
         }
         catch (...) {
             assert(false);
@@ -130,13 +130,13 @@ RET_TYPE IPSME_MsgEnv::unsubscribe(tp_callback p_callback)
     return 0;
 }
 
-RET_TYPE IPSME_MsgEnv::publish(const char* psz_msg)
+RET_TYPE IPSME_MsgEnv::publish(MSG_TYPE msg)
 {
     // printf("%s: \n", __func__); fflush(stdout);
 
     Singleton& s = Singleton::getInstance();
 
-    int ret = mosquitto_publish(s._uptr_mosq.get(), NULL, psz_channel_pattern_, (int) strlen(psz_msg), psz_msg, 0, false);
+    int ret = mosquitto_publish(s._uptr_mosq.get(), NULL, psz_channel_pattern_, (int) strlen(msg), msg, 0, false);
     if (ret) {
         // std::cerr << "Can't publish to topic\n";
         return ret;

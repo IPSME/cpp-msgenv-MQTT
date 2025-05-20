@@ -74,9 +74,12 @@ std::unique_ptr<Singleton> Singleton::_instance;
 //----------------------------------------------------------------------------------------------------------------
 
 std::vector<std::pair<void*, void*>> vec_;
+std::mutex mutex_vec_;
 
 void message_callback_(struct mosquitto* mosq, void* UNUSED, const struct mosquitto_message* p_message)
 {
+    std::lock_guard<std::mutex> lock(mutex_vec_);
+
     // printf("%s: \n", __func__); fflush(stdout);
 
     for (const auto& pair : vec_) {
@@ -101,7 +104,10 @@ RET_TYPE IPSME_MsgEnv::subscribe(tp_callback p_callback, void* p_void)
 
     // printf("%s: \n", __func__); fflush(stdout);
 
-    vec_.emplace_back(p_callback, p_void);
+    {
+        std::lock_guard<std::mutex> lock(mutex_vec_);
+        vec_.emplace_back(p_callback, p_void);
+    }
 
     Singleton& s = Singleton::getInstance();
     int ret= mosquitto_subscribe(s._uptr_mosq.get(), NULL, psz_channel_pattern_, 0);
@@ -118,14 +124,17 @@ RET_TYPE IPSME_MsgEnv::unsubscribe(tp_callback p_callback)
     if (ret)
         return ret;
 
-    vec_.erase(std::remove_if(
-            vec_.begin(), 
-            vec_.end(), 
-            [p_callback](const std::pair<void*, void*>& pair) {
-                return pair.first == p_callback;
-            }),
-            vec_.end()
-        );
+    {
+        std::lock_guard<std::mutex> lock(mutex_vec_);
+        vec_.erase(std::remove_if(
+                vec_.begin(), 
+                vec_.end(), 
+                [p_callback](const std::pair<void*, void*>& pair) {
+                    return pair.first == p_callback;
+                }),
+                vec_.end()
+            );
+    }
 
     return 0;
 }

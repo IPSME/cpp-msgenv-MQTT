@@ -74,22 +74,24 @@ std::unique_ptr<Singleton> Singleton::_instance;
 
 //----------------------------------------------------------------------------------------------------------------
 
-std::vector<std::pair<void*, void*>> vec_;
-std::mutex mutex_vec_;
-
-void message_callback_(struct mosquitto* mosq, void* UNUSED, const struct mosquitto_message* p_message)
+void message_callback_(struct mosquitto* mosq, void* p_void_env, const struct mosquitto_message* p_message)
 {
-    // IPSME_MsgEnv* env = static_cast<IPSME_MsgEnv*>(UNUSED);
+     IPSME_MsgEnv* env = static_cast<IPSME_MsgEnv*>(p_void_env);
 
     // printf("%s: \n", __func__); fflush(stdout);
 
-    std::lock_guard<std::mutex> lock(mutex_vec_);
-    for (const auto& pair : vec_) {
+    std::vector< std::pair<void*, void*> > vec_local;
+    {
+        std::lock_guard<std::mutex> lock(env->_mutex_vec);
+        vec_local = env->_vec;
+    }
+
+    for (const auto& pair : vec_local) {
         tp_callback p_callback= (tp_callback)pair.first;
-        void* p_void= pair.second;
+        void* p_void_payload= pair.second;
 
         try {
-            p_callback(static_cast<IPSME_MsgEnv::MSG_TYPE>(p_message->payload), p_void);
+            p_callback(static_cast<IPSME_MsgEnv::MSG_TYPE>(p_message->payload), p_void_payload);
         }
         catch (...) {
             assert(false);
@@ -101,6 +103,7 @@ void message_callback_(struct mosquitto* mosq, void* UNUSED, const struct mosqui
 
 IPSME_MsgEnv::IPSME_MsgEnv() : _uptr_mosq(mosquitto_new(NULL, true, this), mosquitto_destroy)
 {
+    std::lock_guard<std::mutex> lock(_mutex_mosq);
     mosquitto_message_callback_set(_uptr_mosq.get(), message_callback_);
 
     int delay = 1;  // Initial delay in seconds
@@ -119,15 +122,18 @@ IPSME_MsgEnv::IPSME_MsgEnv() : _uptr_mosq(mosquitto_new(NULL, true, this), mosqu
         if (delay > max_delay)
             delay = max_delay;
     }
-    // Optionally start the background loop
-    std::lock_guard<std::mutex> lock(_mutex_mosq);
-    mosquitto_loop_start(_uptr_mosq.get());
+    
+    // use manual loop mode
+    // int loop_result = mosquitto_loop_start(_uptr_mosq.get());
+    // if (loop_result != MOSQ_ERR_SUCCESS) {
+    //     throw std::runtime_error("Failed to start Mosquitto loop: " + std::string(mosquitto_strerror(loop_result)));
+    // }
 }
 
 IPSME_MsgEnv::~IPSME_MsgEnv()
 {
     std::lock_guard<std::mutex> lock(_mutex_mosq);
-    mosquitto_loop_stop(_uptr_mosq.get(), true);
+    mosquitto_disconnect(_uptr_mosq.get());
 }
 
 //----------------------------------------------------------------------------------------------------------------
@@ -142,8 +148,8 @@ RET_TYPE IPSME_MsgEnv::subscribe(tp_callback p_callback, void* p_void)
     // printf("%s: \n", __func__); fflush(stdout);
 
     {
-        std::lock_guard<std::mutex> lock(mutex_vec_);
-        vec_.emplace_back(p_callback, p_void);
+        std::lock_guard<std::mutex> lock(_mutex_vec);
+        _vec.emplace_back(p_callback, p_void);
     }
 
     std::lock_guard<std::mutex> lock(_mutex_mosq);
@@ -162,14 +168,14 @@ RET_TYPE IPSME_MsgEnv::unsubscribe(tp_callback p_callback)
         return ret;
 
     {
-        std::lock_guard<std::mutex> lock(mutex_vec_);
-        vec_.erase(std::remove_if(
-                vec_.begin(), 
-                vec_.end(), 
+        std::lock_guard<std::mutex> lock(_mutex_vec);
+        _vec.erase(std::remove_if(
+                _vec.begin(), 
+                _vec.end(), 
                 [p_callback](const std::pair<void*, void*>& pair) {
                     return pair.first == p_callback;
                 }),
-                vec_.end()
+                _vec.end()
             );
     }
 
@@ -190,12 +196,10 @@ RET_TYPE IPSME_MsgEnv::publish(MSG_TYPE msg)
     return 0;
 }
 
-/*
 RET_TYPE IPSME_MsgEnv::process_requests(int i_timeout)
 {
     std::lock_guard<std::mutex> lock(_mutex_mosq);
-    mosquitto_loop(s._uptr_mosq.get(), i_timeout, 1);
+    mosquitto_loop(_uptr_mosq.get(), i_timeout, 1);
 
     return 0;
 }
-*/

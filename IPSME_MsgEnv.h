@@ -28,9 +28,16 @@ public:
 
 	RET_TYPE publish(MSG_TYPE);
 
+	RET_TYPE process_requests(int i_timeout= 0);
+
 private:
+	std::vector< std::pair<void*, void*> > _vec;
+	std::mutex _mutex_vec;
+
 	std::unique_ptr<struct mosquitto, decltype(&mosquitto_destroy)> _uptr_mosq;
 	std::mutex _mutex_mosq;
+
+	friend void message_callback_(struct mosquitto* mosq, void* p_void, const struct mosquitto_message* p_message);
 };
 
 #endif // IPSME_MSGENV_H

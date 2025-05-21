@@ -18,61 +18,6 @@ constexpr const int i_server_port = 1883;
 // https://mosquitto.org/api/files/mosquitto-h.html
 
 //----------------------------------------------------------------------------------------------------------------
-// singleton
-
-/*
-void message_callback_(struct mosquitto* mosq, void* obj, const struct mosquitto_message* message);
-
-class Singleton {
-public:
-    static Singleton& getInstance() {
-        static std::once_flag onceFlag;
-        std::call_once(onceFlag, []() { _instance.reset(new Singleton); });
-        return *_instance;
-    }
-
-    // if _uptr_mosq is made private, use a getter().
-    // std::unique_ptr<struct mosquitto, decltype(&mosquitto_destroy)>& getMosquitto() { return _uptr_mosq; }
-
-private:
-    friend struct std::default_delete<Singleton>;
-
-    Singleton() : _uptr_mosq(mosquitto_new(NULL, true, NULL), mosquitto_destroy) 
-    {
-        mosquitto_message_callback_set(_uptr_mosq.get(), message_callback_);
-
-        int delay = 1;  // Initial delay in seconds
-        const int max_delay = 60;  // Maximum delay in seconds
-
-        while (true) {
-            int connect_result = mosquitto_connect(_uptr_mosq.get(), "localhost", 1883, 60);
-            if (connect_result == MOSQ_ERR_SUCCESS)
-                break;
-
-            // std::cerr << "Mosquitto connect failed: " << mosquitto_strerror(connect_result) << std::endl;
-
-            std::this_thread::sleep_for(std::chrono::seconds(delay));
-            delay *= 2;
-
-            if (delay > max_delay)
-                delay = max_delay;
-        }
-    }
-
-    ~Singleton() = default;
-    Singleton(const Singleton&) = delete;
-    Singleton& operator=(const Singleton&) = delete;
-
-    static std::unique_ptr<Singleton> _instance;
-
-public: // private: 
-    std::unique_ptr<struct mosquitto, decltype(&mosquitto_destroy)> _uptr_mosq;
-};
-
-std::unique_ptr<Singleton> Singleton::_instance;
-*/
-
-//----------------------------------------------------------------------------------------------------------------
 
 void message_callback_(struct mosquitto* mosq, void* p_void_env, const struct mosquitto_message* p_message)
 {

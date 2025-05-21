@@ -170,7 +170,7 @@ RET_TYPE IPSME_MsgEnv::publish(MSG_TYPE msg)
     return 0;
 }
 
-RET_TYPE IPSME_MsgEnv::process_requests(int i_timeout)
+RET_TYPE IPSME_MsgEnv::process_msgs(int i_timeout)
 {
     std::lock_guard<std::mutex> lock(_mutex_mosq_sub);
     mosquitto_loop(_uptr_mosq_sub.get(), i_timeout, 1);

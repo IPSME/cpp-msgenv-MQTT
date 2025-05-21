@@ -28,7 +28,7 @@ public:
 
 	RET_TYPE publish(MSG_TYPE);
 
-	RET_TYPE process_requests(int i_timeout= 0);
+	RET_TYPE process_msgs(int i_timeout= 0);
 
 private:
 	std::vector< std::pair<void*, void*> > _vec;

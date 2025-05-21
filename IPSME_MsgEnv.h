@@ -34,8 +34,10 @@ private:
 	std::vector< std::pair<void*, void*> > _vec;
 	std::mutex _mutex_vec;
 
-	std::unique_ptr<struct mosquitto, decltype(&mosquitto_destroy)> _uptr_mosq;
-	std::mutex _mutex_mosq;
+	std::unique_ptr<struct mosquitto, decltype(&mosquitto_destroy)> _uptr_mosq_pub;
+	std::unique_ptr<struct mosquitto, decltype(&mosquitto_destroy)> _uptr_mosq_sub;
+	std::mutex _mutex_mosq_pub;
+	std::mutex _mutex_mosq_sub;
 
 	friend void message_callback_(struct mosquitto* mosq, void* p_void, const struct mosquitto_message* p_message);
 };

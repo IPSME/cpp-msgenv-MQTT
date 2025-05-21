@@ -14,21 +14,19 @@
 
 class IPSME_MsgEnv {
 public:
-	typedef int RET_TYPE;
-	typedef char const * const MSG_TYPE;
-
-	typedef void (*tp_callback)(MSG_TYPE, void* p_void);
+	typedef char const * const t_MSG;
+	typedef void (*tp_callback)(t_MSG, void* p_void);
 
 public:
 	IPSME_MsgEnv();
 	~IPSME_MsgEnv();
 
-	RET_TYPE subscribe(tp_callback p_callback, void* p_void);
-	RET_TYPE unsubscribe(tp_callback p_callback);
+	bool subscribe(tp_callback p_callback, void* p_void);
+	bool unsubscribe(tp_callback p_callback);
 
-	RET_TYPE publish(MSG_TYPE);
+	bool publish(t_MSG);
 
-	RET_TYPE process_msgs(int i_timeout= 0);
+	void process_msgs(int i_timeout= 0);
 
 private:
 	std::vector< std::pair<void*, void*> > _vec;

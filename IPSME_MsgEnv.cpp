@@ -7,7 +7,6 @@
 #include <unordered_map>
 
 #include "IPSME_MsgEnv.h"
-using RET_TYPE = IPSME_MsgEnv::RET_TYPE;
 using tp_callback = IPSME_MsgEnv::tp_callback;
 
 constexpr char const * const psz_channel_pattern_ = "IPSME";
@@ -36,7 +35,7 @@ void message_callback_(struct mosquitto* mosq, void* p_void_env, const struct mo
         void* p_void_payload= pair.second;
 
         try {
-            p_callback(static_cast<IPSME_MsgEnv::MSG_TYPE>(p_message->payload), p_void_payload);
+            p_callback(static_cast<IPSME_MsgEnv::t_MSG>(p_message->payload), p_void_payload);
         }
         catch (...) {
             assert(false);
@@ -112,11 +111,11 @@ IPSME_MsgEnv::~IPSME_MsgEnv()
 
 //----------------------------------------------------------------------------------------------------------------
 
-RET_TYPE IPSME_MsgEnv::subscribe(tp_callback p_callback, void* p_void)
+bool IPSME_MsgEnv::subscribe(tp_callback p_callback, void* p_void)
 {
     if (!p_callback) {
         assert(false);
-        return 1;
+        return false;
     }
 
     // printf("%s: \n", __func__); fflush(stdout);
@@ -129,17 +128,17 @@ RET_TYPE IPSME_MsgEnv::subscribe(tp_callback p_callback, void* p_void)
     std::lock_guard<std::mutex> lock(_mutex_mosq_sub);
     int ret= mosquitto_subscribe(_uptr_mosq_sub.get(), NULL, psz_channel_pattern_, 0);
     if (ret)
-        return ret;
+        return false;
 
-    return 0;
+    return true;
 }
 
-RET_TYPE IPSME_MsgEnv::unsubscribe(tp_callback p_callback)
+bool IPSME_MsgEnv::unsubscribe(tp_callback p_callback)
 {
     std::lock_guard<std::mutex> lock(_mutex_mosq_sub);
     int ret= mosquitto_unsubscribe(_uptr_mosq_sub.get(), NULL, psz_channel_pattern_);
     if (ret)
-        return ret;
+        return false;
 
     {
         std::lock_guard<std::mutex> lock(_mutex_vec);
@@ -153,10 +152,10 @@ RET_TYPE IPSME_MsgEnv::unsubscribe(tp_callback p_callback)
             );
     }
 
-    return 0;
+    return true;
 }
 
-RET_TYPE IPSME_MsgEnv::publish(MSG_TYPE msg)
+bool IPSME_MsgEnv::publish(t_MSG msg)
 {
     // printf("%s: \n", __func__); fflush(stdout);
 
@@ -164,16 +163,14 @@ RET_TYPE IPSME_MsgEnv::publish(MSG_TYPE msg)
     int ret = mosquitto_publish(_uptr_mosq_pub.get(), NULL, psz_channel_pattern_, (int) strlen(msg), msg, 0, false);
     if (ret) {
         // std::cerr << "Can't publish to topic\n";
-        return ret;
+        return false;
     }
 
-    return 0;
+    return true;
 }
 
-RET_TYPE IPSME_MsgEnv::process_msgs(int i_timeout)
+void IPSME_MsgEnv::process_msgs(int i_timeout)
 {
     std::lock_guard<std::mutex> lock(_mutex_mosq_sub);
     mosquitto_loop(_uptr_mosq_sub.get(), i_timeout, 1);
-
-    return 0;
 }

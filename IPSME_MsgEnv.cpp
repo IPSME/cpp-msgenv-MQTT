@@ -62,6 +62,7 @@ IPSME_MsgEnv::IPSME_MsgEnv() :
             if (connect_result == MOSQ_ERR_SUCCESS)
                 break;
 
+#pragma message("TODO: failed connection shouldn't hang silently e.g., if c'tor called before mosq init")
             // std::cerr << "Mosquitto connect failed: " << mosquitto_strerror(connect_result) << std::endl;
 
             std::this_thread::sleep_for(std::chrono::seconds(delay));

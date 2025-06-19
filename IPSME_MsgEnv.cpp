@@ -172,6 +172,12 @@ bool IPSME_MsgEnv::publish(t_MSG msg)
 
 void IPSME_MsgEnv::process_msgs(int i_timeout)
 {
-    std::lock_guard<std::mutex> lock(_mutex_mosq_sub);
-    mosquitto_loop(_uptr_mosq_sub.get(), i_timeout, 1);
+    {
+        std::lock_guard<std::mutex> lock(_mutex_mosq_pub);
+        mosquitto_loop(_uptr_mosq_pub.get(), i_timeout, 1);
+    }
+    {
+        std::lock_guard<std::mutex> lock(_mutex_mosq_sub);
+        mosquitto_loop(_uptr_mosq_sub.get(), i_timeout, 1);
+    }
 }

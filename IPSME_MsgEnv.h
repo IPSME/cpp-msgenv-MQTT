@@ -8,6 +8,7 @@
 
 #include <mosquitto.h>
 #include <mutex>
+#include <vector>
 
 // rather than include an init() in the interface
 // we assume the dev knows we are using mosquitto and calls mosquitto_lib_init() and mosquitto_lib_cleanup()

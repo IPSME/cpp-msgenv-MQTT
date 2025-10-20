@@ -18,12 +18,6 @@ public:
 	typedef char const * const t_MSG;
 	typedef void (*tp_callback)(t_MSG, void* p_void);
 
-	typedef enum : signed int {
-		k_ERROR = -1,
-		k_NOP = 0,
-		k_HANDLED = 1,
-	} t_RET;
-
 public:
 	IPSME_MsgEnv();
 	~IPSME_MsgEnv();

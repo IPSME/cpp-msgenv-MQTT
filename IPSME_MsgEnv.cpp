@@ -53,6 +53,33 @@ void message_callback_(struct mosquitto* mosq, void* p_void_env, const struct mo
 
 //----------------------------------------------------------------------------------------------------------------
 
+static void reconnect_with_exponential_backoff(struct mosquitto *mosq, const char* psz_host, int i_port, int i_keepalive)
+{
+    int rc = mosquitto_reconnect(mosq);
+    if (rc == MOSQ_ERR_SUCCESS)
+        return;
+
+    mosquitto_disconnect(mosq);
+
+    int delay = 1;  // Initial delay in seconds
+    const int max_delay = 60;  // Maximum delay in seconds
+
+    while (true) {
+        int connect_result = mosquitto_connect(mosq, psz_host, i_port, i_keepalive);
+        if (connect_result == MOSQ_ERR_SUCCESS)
+            break;
+
+#pragma message("TODO: failed connection shouldn't hang silently e.g., if c'tor called before mosq init")
+        DebugPrint("Mosquitto connect failed: [%d] \n", mosquitto_strerror(connect_result));
+
+        std::this_thread::sleep_for(std::chrono::seconds(delay));
+        delay *= 2;
+
+        if (delay > max_delay)
+            delay = max_delay;
+    }
+}
+
 IPSME_MsgEnv::IPSME_MsgEnv() : 
     _uptr_mosq_pub(mosquitto_new(NULL, true, NULL), mosquitto_destroy),
     _uptr_mosq_sub(mosquitto_new(NULL, true, this), mosquitto_destroy) // NOTE: this ptr
@@ -62,42 +89,13 @@ IPSME_MsgEnv::IPSME_MsgEnv() :
         std::lock_guard<std::mutex> lock(_mutex_mosq_sub);
         mosquitto_message_callback_set(_uptr_mosq_sub.get(), message_callback_);
 
-        int delay = 1;  // Initial delay in seconds
-        const int max_delay = 60;  // Maximum delay in seconds
-
-        while (true) {
-            int connect_result = mosquitto_connect(_uptr_mosq_sub.get(), psz_server_address_, i_server_port, 60);
-            if (connect_result == MOSQ_ERR_SUCCESS)
-                break;
-
-#pragma message("TODO: failed connection shouldn't hang silently e.g., if c'tor called before mosq init")
-            DebugPrint("Mosquitto connect failed: [%d] \n", mosquitto_strerror(connect_result));
-
-            std::this_thread::sleep_for(std::chrono::seconds(delay));
-            delay *= 2;
-
-            if (delay > max_delay)
-                delay = max_delay;
-        }
+        reconnect_with_exponential_backoff(_uptr_mosq_sub.get(), psz_server_address_, i_server_port, 60);
     }
 
     // Initialize publisher connection
     {
         std::lock_guard<std::mutex> lock(_mutex_mosq_pub);
-
-        int delay = 1;  // Initial delay in seconds
-        const int max_delay = 60;  // Maximum delay in seconds
-
-        while (true) {
-            int connect_result = mosquitto_connect(_uptr_mosq_pub.get(), psz_server_address_, i_server_port, 60);
-            if (connect_result == MOSQ_ERR_SUCCESS)
-                break;
-
-            std::this_thread::sleep_for(std::chrono::seconds(delay));
-            delay *= 2;
-            if (delay > max_delay)
-                delay = max_delay;
-        }
+        reconnect_with_exponential_backoff(_uptr_mosq_pub.get(), psz_server_address_, i_server_port, 60);
     }
     
     // use manual loop mode: Failed to start Mosquitto loop : This feature is not supported.
@@ -220,18 +218,11 @@ void IPSME_MsgEnv::process_msgs(int i_timeout)
         int ret = mosquitto_loop(_uptr_mosq_pub.get(), i_timeout, 1);
         if (ret != MOSQ_ERR_SUCCESS)
         {
-            DebugPrint("mosquitto_loop(pub) failed: %d\n", mosquitto_strerror(ret));
+            // DebugPrint("mosquitto_loop(pub) failed: %d\n", mosquitto_strerror(ret));
             std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Sleep for 100 milliseconds
 
-            if (ret == MOSQ_ERR_CONN_LOST || ret == MOSQ_ERR_NO_CONN) {
-                //int delay = 1;
-                //const int max_delay = 60;
-                //while (true) {
-                //    int connect_result = mosquitto_connect(_uptr_mosq_sub.get(), psz_server_address_, i_server_port, 60);
-                //    if (connect_result == MOSQ_ERR_SUCCESS) break;
-                //    std::this_thread::sleep_for(std::chrono::seconds(delay));
-                //    delay = std::min(delay * 2, max_delay);
-            }
+            if (ret == MOSQ_ERR_CONN_LOST || ret == MOSQ_ERR_NO_CONN) 
+                reconnect_with_exponential_backoff(_uptr_mosq_pub.get(), psz_server_address_, i_server_port, 60);
         }
     }
     {
@@ -239,10 +230,14 @@ void IPSME_MsgEnv::process_msgs(int i_timeout)
         int ret = mosquitto_loop(_uptr_mosq_sub.get(), i_timeout, 1);
         if (ret != MOSQ_ERR_SUCCESS)
         {
-            DebugPrint("mosquitto_loop(sub) failed: %d\n", mosquitto_strerror(ret));
+            // DebugPrint("mosquitto_loop(sub) failed: %d\n", mosquitto_strerror(ret));
             std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Sleep for 100 milliseconds
 
-            if (ret == MOSQ_ERR_CONN_LOST || ret == MOSQ_ERR_NO_CONN) {
+            if (ret == MOSQ_ERR_CONN_LOST || ret == MOSQ_ERR_NO_CONN)
+            {
+                reconnect_with_exponential_backoff(_uptr_mosq_sub.get(), psz_server_address_, i_server_port, 60);
+                if (mosquitto_subscribe(_uptr_mosq_sub.get(), NULL, psz_channel_pattern_, 0))
+                    DebugPrint("mosquitto_loop(sub): failed to resubscribe %d\n", mosquitto_strerror(ret));
             }
         }
     }

@@ -53,6 +53,29 @@ void message_callback_(struct mosquitto* mosq, void* p_void_env, const struct mo
 
 //----------------------------------------------------------------------------------------------------------------
 
+static void on_connect_v2(struct mosquitto *mosq, void *userdata, int rc, int flags, const void *props)
+{
+    (void)mosq; (void)flags; (void)props;  // unused in most cases
+
+    if (rc == 0)
+        DebugPrint("MQTT connected / reconnected successfully\n");
+    else
+        DebugPrint("MQTT connection failed: %s\n", mosquitto_connack_string(rc));
+}
+
+// For very old Mosquitto <2.0 you can also define this one (optional)
+static void on_connect_v1(struct mosquitto *mosq, void *userdata, int rc) {
+    on_connect_v2(mosq, userdata, rc, 0, nullptr);
+}
+
+static void on_disconnect(struct mosquitto *, void *userdata, int rc)
+{
+    if (rc == 0)
+        DebugPrint("MQTT clean disconnect\n");
+    else
+        DebugPrint("MQTT DISCONNECTED unexpectedly (will auto-reconnect)\n");
+}
+
 static void reconnect_with_exponential_backoff(struct mosquitto *mosq, const char* psz_host, int i_port, int i_keepalive)
 {
     int rc = mosquitto_reconnect(mosq);
@@ -69,7 +92,6 @@ static void reconnect_with_exponential_backoff(struct mosquitto *mosq, const cha
         if (connect_result == MOSQ_ERR_SUCCESS)
             break;
 
-#pragma message("TODO: failed connection shouldn't hang silently e.g., if c'tor called before mosq init")
         DebugPrint("Mosquitto connect failed: [%d] \n", mosquitto_strerror(connect_result));
 
         std::this_thread::sleep_for(std::chrono::seconds(delay));
@@ -84,9 +106,13 @@ IPSME_MsgEnv::IPSME_MsgEnv() :
     _uptr_mosq_pub(mosquitto_new(NULL, true, NULL), mosquitto_destroy),
     _uptr_mosq_sub(mosquitto_new(NULL, true, this), mosquitto_destroy) // NOTE: this ptr
 {
+    // reconnect_ will have if the if c'tor is called before mosq init
+
     // Initialize subscriber connection
     {
         std::lock_guard<std::mutex> lock(_mutex_mosq_sub);
+        mosquitto_connect_callback_set(_uptr_mosq_sub.get(), on_connect_v1);
+        mosquitto_disconnect_callback_set(_uptr_mosq_sub.get(), on_disconnect);
         mosquitto_message_callback_set(_uptr_mosq_sub.get(), message_callback_);
 
         reconnect_with_exponential_backoff(_uptr_mosq_sub.get(), psz_server_address_, i_server_port, 60);
@@ -95,6 +121,8 @@ IPSME_MsgEnv::IPSME_MsgEnv() :
     // Initialize publisher connection
     {
         std::lock_guard<std::mutex> lock(_mutex_mosq_pub);
+        mosquitto_connect_callback_set(_uptr_mosq_pub.get(), on_connect_v1);
+        mosquitto_disconnect_callback_set(_uptr_mosq_pub.get(), on_disconnect);
         reconnect_with_exponential_backoff(_uptr_mosq_pub.get(), psz_server_address_, i_server_port, 60);
     }
     

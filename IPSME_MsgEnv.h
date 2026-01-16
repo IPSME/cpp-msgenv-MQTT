@@ -6,6 +6,8 @@
 #ifndef IPSME_MSGENV_H
 #define IPSME_MSGENV_H
 
+#pragma comment(lib, "mosquitto.lib")
+
 #include <mosquitto.h>
 #include <mutex>
 #include <vector>

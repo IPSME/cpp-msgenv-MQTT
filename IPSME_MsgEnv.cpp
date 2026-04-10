@@ -115,7 +115,8 @@ IPSME_MsgEnv::IPSME_MsgEnv() :
         mosquitto_disconnect_callback_set(_uptr_mosq_sub.get(), on_disconnect);
         mosquitto_message_callback_set(_uptr_mosq_sub.get(), message_callback_);
 
-        reconnect_with_exponential_backoff(_uptr_mosq_sub.get(), psz_server_address_, i_server_port, 60);
+        if (mosquitto_connect(_uptr_mosq_sub.get(), psz_server_address_, i_server_port, 60) != MOSQ_ERR_SUCCESS)
+            DebugPrint("MQTT sub initial connect failed, will retry via process_msgs\n");
     }
 
     // Initialize publisher connection
@@ -123,7 +124,8 @@ IPSME_MsgEnv::IPSME_MsgEnv() :
         std::lock_guard<std::mutex> lock(_mutex_mosq_pub);
         mosquitto_connect_callback_set(_uptr_mosq_pub.get(), on_connect_v1);
         mosquitto_disconnect_callback_set(_uptr_mosq_pub.get(), on_disconnect);
-        reconnect_with_exponential_backoff(_uptr_mosq_pub.get(), psz_server_address_, i_server_port, 60);
+        if (mosquitto_connect(_uptr_mosq_pub.get(), psz_server_address_, i_server_port, 60) != MOSQ_ERR_SUCCESS)
+            DebugPrint("MQTT pub initial connect failed, will retry via process_msgs\n");
     }
     
     // use manual loop mode: Failed to start Mosquitto loop : This feature is not supported.
@@ -148,7 +150,7 @@ IPSME_MsgEnv::~IPSME_MsgEnv()
 
 /* Grok:
 
-Issue: The subscribe function subscribes to the same topic(psz_channel_pattern_) every time a new callback is added, which is inefficient and may fail if the broker rejects duplicate subscriptions(depending on the broker’s implementation).Similarly, unsubscribe removes the subscription for the topic even if other callbacks in _vec still need it, potentially causing subsequent messages to be missed.
+Issue: The subscribe function subscribes to the same topic(psz_channel_pattern_) every time a new callback is added, which is inefficient and may fail if the broker rejects duplicate subscriptions(depending on the broker's implementation).Similarly, unsubscribe removes the subscription for the topic even if other callbacks in _vec still need it, potentially causing subsequent messages to be missed.
 
 - Track the subscription state to avoid redundant subscriptions.For example, maintain a counter for active subscriptions to psz_channel_pattern_.
 - Only unsubscribe when the last callback is removed :

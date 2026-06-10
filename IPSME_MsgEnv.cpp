@@ -5,6 +5,9 @@
 #include <memory>
 //#include <iostream>
 #include <unordered_map>
+#include <thread>     // std::this_thread::sleep_for
+#include <chrono>     // std::chrono::seconds / milliseconds
+#include <algorithm>  // std::remove_if
 
 #include "../g_.hpp"
 
@@ -194,7 +197,10 @@ bool IPSME_MsgEnv::subscribe(tp_callback p_callback, void* p_void)
 
     {
         std::lock_guard<std::mutex> lock(_mutex_vec);
-        _vec.emplace_back(p_callback, p_void);
+        // Store the callback as void* explicitly. MSVC converts a function
+        // pointer to void* implicitly; ISO C++ (g++/clang) requires the cast.
+        // message_callback_ casts it back the same way.
+        _vec.emplace_back(reinterpret_cast<void*>(p_callback), p_void);
     }
 
     std::lock_guard<std::mutex> lock(_mutex_mosq_sub);
